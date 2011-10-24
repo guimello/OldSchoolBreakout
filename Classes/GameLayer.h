@@ -1,5 +1,5 @@
 //
-//  HelloWorldLayer.h
+//  GameLayer.h
 //  OldSchoolBreakout
 //
 //  Created by Guilherme da Silva Mello on 10/24/11.
@@ -12,14 +12,14 @@
 #import "Box2D.h"
 #import "GLES-Render.h"
 
-// HelloWorldLayer
-@interface HelloWorldLayer : CCLayer
+// GameLayer
+@interface GameLayer : CCLayer
 {
 	b2World* world;
 	GLESDebugDraw *m_debugDraw;
 }
 
-// returns a CCScene that contains the HelloWorldLayer as the only child
+// returns a CCScene that contains the GameLayer as the only child
 +(CCScene *) scene;
 // adds a new sprite at a given coordinate
 -(void) addNewSpriteWithCoords:(CGPoint)p;

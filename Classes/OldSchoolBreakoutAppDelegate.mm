@@ -10,7 +10,7 @@
 
 #import "OldSchoolBreakoutAppDelegate.h"
 #import "GameConfig.h"
-#import "HelloWorldLayer.h"
+#import "GameLayer.h"
 #import "RootViewController.h"
 
 @implementation OldSchoolBreakoutAppDelegate
@@ -111,7 +111,7 @@
 	[self removeStartupFlicker];
 	
 	// Run the intro Scene
-	[[CCDirector sharedDirector] runWithScene: [HelloWorldLayer scene]];
+	[[CCDirector sharedDirector] runWithScene: [GameLayer scene]];
 }
 
 

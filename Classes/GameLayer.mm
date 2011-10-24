@@ -1,5 +1,5 @@
 //
-//  HelloWorldLayer.mm
+//  GameLayer.mm
 //  OldSchoolBreakout
 //
 //  Created by Guilherme da Silva Mello on 10/24/11.
@@ -8,7 +8,7 @@
 
 
 // Import the interfaces
-#import "HelloWorldLayer.h"
+#import "GameLayer.h"
 
 //Pixel to metres ratio. Box2D uses metres as the unit for measurement.
 //This ratio defines how many pixels correspond to 1 Box2D "metre"
@@ -24,8 +24,8 @@ enum {
 };
 
 
-// HelloWorldLayer implementation
-@implementation HelloWorldLayer
+// GameLayer implementation
+@implementation GameLayer
 
 +(CCScene *) scene
 {
@@ -33,7 +33,7 @@ enum {
 	CCScene *scene = [CCScene node];
 	
 	// 'layer' is an autorelease object.
-	HelloWorldLayer *layer = [HelloWorldLayer node];
+	GameLayer *layer = [GameLayer node];
 	
 	// add layer as a child to scene
 	[scene addChild: layer];
