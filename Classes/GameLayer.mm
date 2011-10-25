@@ -71,7 +71,7 @@ enum {
 
 		// Debug Draw functions
 		m_debugDraw = new GLESDebugDraw( PTM_RATIO );
-		_world->SetDebugDraw(m_debugDraw);
+		//_world->SetDebugDraw(m_debugDraw);
 
 		uint32 flags = 0;
 		flags += b2DebugDraw::e_shapeBit;
@@ -102,12 +102,12 @@ enum {
 		groundBox.SetAsEdge(b2Vec2(0,0), b2Vec2(screenSize.width/PTM_RATIO,0));
 		_bottomFixture = _groundBody->CreateFixture(&groundBoxDef);
 
-		// top
-		groundBox.SetAsEdge(b2Vec2(0, screenSize.height/PTM_RATIO), b2Vec2(screenSize.width/PTM_RATIO, screenSize.height/PTM_RATIO));
+        // left
+        groundBox.SetAsEdge(b2Vec2(0,0), b2Vec2(0, screenSize.height/PTM_RATIO));
 		_groundBody->CreateFixture(&groundBoxDef);
 
-		// left
-        groundBox.SetAsEdge(b2Vec2(0,0), b2Vec2(0, screenSize.height/PTM_RATIO));
+		// top
+		groundBox.SetAsEdge(b2Vec2(0, screenSize.height/PTM_RATIO), b2Vec2(screenSize.width/PTM_RATIO, screenSize.height/PTM_RATIO));
 		_groundBody->CreateFixture(&groundBoxDef);
 
 		// right
@@ -239,7 +239,7 @@ enum {
     }
 }
 
-- (void)ccTouchesBeganWithEvent:(NSSet*)touches withEvent:(UIEvent*)event {
+- (void)ccTouchesBegan:(NSSet*)touches withEvent:(UIEvent*)event {
     if (_mouseJoint != NULL) return;
 
     UITouch *myTouch = [touches anyObject];
@@ -261,7 +261,7 @@ enum {
     }
 }
 
-- (void)ccTouchesMovedWithEvent:(NSSet*)touches withEvent:(UIEvent*)event {
+- (void)ccTouchesMoved:(NSSet*)touches withEvent:(UIEvent*)event {
     if (_mouseJoint == NULL) return;
 
     UITouch *myTouch = [touches anyObject];
@@ -272,7 +272,7 @@ enum {
     _mouseJoint->SetTarget(locationWorld);
 }
 
-- (void)ccTouchesCancelledWithEvent:(NSSet*)touches withEvent:(UIEvent*)event {
+- (void)ccTouchesCancelled:(NSSet*)touches withEvent:(UIEvent*)event {
     if (_mouseJoint) {
         _world->DestroyJoint(_mouseJoint);
         _mouseJoint = NULL;
