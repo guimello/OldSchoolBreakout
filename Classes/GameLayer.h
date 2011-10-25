@@ -13,15 +13,19 @@
 #import "GLES-Render.h"
 
 // GameLayer
-@interface GameLayer : CCLayer
-{
-	b2World* world;
+@interface GameLayer : CCLayer {
 	GLESDebugDraw *m_debugDraw;
+
+    b2World *_world;
+    b2Body *_groundBody;
+    b2Body *_paddleBody;
+    b2Fixture *_paddleFixture;
+    b2Fixture *_ballFixture;
+    b2Fixture *_bottomFixture;
+    b2MouseJoint *_mouseJoint;
 }
 
 // returns a CCScene that contains the GameLayer as the only child
-+(CCScene *) scene;
-// adds a new sprite at a given coordinate
--(void) addNewSpriteWithCoords:(CGPoint)p;
++ (CCScene*)scene;
 
 @end

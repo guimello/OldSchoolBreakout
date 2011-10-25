@@ -23,234 +23,276 @@ enum {
 	kTagAnimation1 = 1,
 };
 
+enum {
+    kTagBall = 1,
+};
+
 
 // GameLayer implementation
 @implementation GameLayer
 
-+(CCScene *) scene
-{
++ (CCScene*)scene {
 	// 'scene' is an autorelease object.
 	CCScene *scene = [CCScene node];
-	
+
 	// 'layer' is an autorelease object.
 	GameLayer *layer = [GameLayer node];
-	
+
 	// add layer as a child to scene
 	[scene addChild: layer];
-	
+
 	// return the scene
 	return scene;
 }
 
 // on "init" you need to initialize your instance
--(id) init
-{
+- (id)init {
 	// always call "super" init
 	// Apple recommends to re-assign "self" with the "super" return value
-	if( (self=[super init])) {
-		
+	if( (self = [super init])) {
+
 		// enable touches
 		self.isTouchEnabled = YES;
-		
-		// enable accelerometer
-		self.isAccelerometerEnabled = YES;
-		
+
 		CGSize screenSize = [CCDirector sharedDirector].winSize;
-		CCLOG(@"Screen width %0.2f screen height %0.2f",screenSize.width,screenSize.height);
-		
+		CCLOG(@"Screen width %0.2f screen height %0.2f", screenSize.width, screenSize.height);
+
 		// Define the gravity vector.
-		b2Vec2 gravity;
-		gravity.Set(0.0f, -10.0f);
-		
+		//b2Vec2 gravity;
+		//gravity.Set(0.0f, 0.0f);
+        b2Vec2 gravity = b2Vec2(0.0f, 0.0f);
+
 		// Do we want to let bodies sleep?
 		// This will speed up the physics simulation
 		bool doSleep = true;
-		
+
 		// Construct a world object, which will hold and simulate the rigid bodies.
-		world = new b2World(gravity, doSleep);
-		
-		world->SetContinuousPhysics(true);
-		
+		_world = new b2World(gravity, doSleep);
+
 		// Debug Draw functions
 		m_debugDraw = new GLESDebugDraw( PTM_RATIO );
-		world->SetDebugDraw(m_debugDraw);
-		
+		_world->SetDebugDraw(m_debugDraw);
+
 		uint32 flags = 0;
 		flags += b2DebugDraw::e_shapeBit;
 //		flags += b2DebugDraw::e_jointBit;
 //		flags += b2DebugDraw::e_aabbBit;
 //		flags += b2DebugDraw::e_pairBit;
 //		flags += b2DebugDraw::e_centerOfMassBit;
-		m_debugDraw->SetFlags(flags);		
-		
-		
+		m_debugDraw->SetFlags(flags);
+
+		// Create edges around the entire screen
+
 		// Define the ground body.
 		b2BodyDef groundBodyDef;
 		groundBodyDef.position.Set(0, 0); // bottom-left corner
-		
+
 		// Call the body factory which allocates memory for the ground body
 		// from a pool and creates the ground box shape (also from a pool).
 		// The body is also added to the world.
-		b2Body* groundBody = world->CreateBody(&groundBodyDef);
-		
+		_groundBody = _world->CreateBody(&groundBodyDef);
+
 		// Define the ground box shape.
-		b2PolygonShape groundBox;		
-		
+		b2PolygonShape groundBox;
+		b2FixtureDef groundBoxDef;
+
+        groundBoxDef.shape = &groundBox;
+
 		// bottom
 		groundBox.SetAsEdge(b2Vec2(0,0), b2Vec2(screenSize.width/PTM_RATIO,0));
-		groundBody->CreateFixture(&groundBox,0);
-		
+		_bottomFixture = _groundBody->CreateFixture(&groundBoxDef);
+
 		// top
-		groundBox.SetAsEdge(b2Vec2(0,screenSize.height/PTM_RATIO), b2Vec2(screenSize.width/PTM_RATIO,screenSize.height/PTM_RATIO));
-		groundBody->CreateFixture(&groundBox,0);
-		
+		groundBox.SetAsEdge(b2Vec2(0, screenSize.height/PTM_RATIO), b2Vec2(screenSize.width/PTM_RATIO, screenSize.height/PTM_RATIO));
+		_groundBody->CreateFixture(&groundBoxDef);
+
 		// left
-		groundBox.SetAsEdge(b2Vec2(0,screenSize.height/PTM_RATIO), b2Vec2(0,0));
-		groundBody->CreateFixture(&groundBox,0);
-		
+        groundBox.SetAsEdge(b2Vec2(0,0), b2Vec2(0, screenSize.height/PTM_RATIO));
+		_groundBody->CreateFixture(&groundBoxDef);
+
 		// right
-		groundBox.SetAsEdge(b2Vec2(screenSize.width/PTM_RATIO,screenSize.height/PTM_RATIO), b2Vec2(screenSize.width/PTM_RATIO,0));
-		groundBody->CreateFixture(&groundBox,0);
-		
-		
-		//Set up sprite
-		
-		CCSpriteBatchNode *batch = [CCSpriteBatchNode batchNodeWithFile:@"blocks.png" capacity:150];
-		[self addChild:batch z:0 tag:kTagBatchNode];
-		
-		[self addNewSpriteWithCoords:ccp(screenSize.width/2, screenSize.height/2)];
-		
-		CCLabelTTF *label = [CCLabelTTF labelWithString:@"Tap screen" fontName:@"Marker Felt" fontSize:32];
-		[self addChild:label z:0];
-		[label setColor:ccc3(0,0,255)];
-		label.position = ccp( screenSize.width/2, screenSize.height-50);
-		
+		groundBox.SetAsEdge(b2Vec2(screenSize.width/PTM_RATIO, screenSize.height/PTM_RATIO), b2Vec2(screenSize.width/PTM_RATIO,0));
+		_groundBody->CreateFixture(&groundBoxDef);
+
+
+		// Set up sprite
+
+        CCSprite *ball = [CCSprite spriteWithFile:@"Ball.png" rect:CGRectMake(0, 0, 52, 52)];
+        ball.position = ccp(100, 100);
+        ball.tag = kTagBall;
+        [self addChild:ball];
+
+        // Create ball body
+        b2BodyDef ballBodyDef;
+        ballBodyDef.type = b2_dynamicBody;
+        ballBodyDef.position.Set(100/PTM_RATIO, 100/PTM_RATIO);
+        ballBodyDef.userData = ball;
+        b2Body *ballBody = _world->CreateBody(&ballBodyDef);
+
+        // Create circle shape
+        b2CircleShape circle;
+        circle.m_radius = 26.0/PTM_RATIO;
+
+        // Create shape definition and add to body
+        b2FixtureDef ballShapeDef;
+        ballShapeDef.shape = &circle;
+        ballShapeDef.density = 1.0f;
+        ballShapeDef.friction = 0.0f;
+        ballShapeDef.restitution = 1.0f;
+        _ballFixture = ballBody->CreateFixture(&ballShapeDef);
+
+        // Give the shape initial impulse
+        b2Vec2 force = b2Vec2(10, 10);
+        ballBody->ApplyLinearImpulse(force, ballBodyDef.position);
+
+        //Create paddle and add it to the layer
+        CCSprite *paddle = [CCSprite spriteWithFile:@"Paddle.png"];
+        paddle.position = ccp(screenSize.width/2, 50);
+        [self addChild:paddle];
+
+        // Create paddle body
+        b2BodyDef paddleBodyDef;
+        paddleBodyDef.type = b2_dynamicBody;
+        paddleBodyDef.position.Set(screenSize.width/2/PTM_RATIO, 50/PTM_RATIO);
+        paddleBodyDef.userData = paddle;
+        _paddleBody = _world->CreateBody(&paddleBodyDef);
+
+        // Create paddle shape
+        b2PolygonShape paddleShape;
+        paddleShape.SetAsBox(paddle.contentSize.width/PTM_RATIO/2, paddle.contentSize.height/PTM_RATIO/2);
+
+        // Create shape definition and add to body
+        b2FixtureDef paddleShapeDef;
+        paddleShapeDef.shape = &paddleShape;
+        paddleShapeDef.density = 10.0f;
+        paddleShapeDef.friction = 0.4f;
+        paddleShapeDef.restitution = 0.1f;
+        _paddleFixture = _paddleBody->CreateFixture(&paddleShapeDef);
+
+        // Restrict paddle along the x axis
+        b2PrismaticJointDef jointDef;
+        b2Vec2 worldAxis(1.0f, 0.0f);
+        jointDef.collideConnected = true;
+        jointDef.Initialize(_paddleBody, _groundBody, _paddleBody->GetWorldCenter(), worldAxis);
+        _world->CreateJoint(&jointDef);
+
+
 		[self schedule: @selector(tick:)];
 	}
+
 	return self;
 }
 
--(void) draw
-{
+-(void) draw {
 	// Default GL states: GL_TEXTURE_2D, GL_VERTEX_ARRAY, GL_COLOR_ARRAY, GL_TEXTURE_COORD_ARRAY
-	// Needed states:  GL_VERTEX_ARRAY, 
+	// Needed states:  GL_VERTEX_ARRAY,
 	// Unneeded states: GL_TEXTURE_2D, GL_COLOR_ARRAY, GL_TEXTURE_COORD_ARRAY
 	glDisable(GL_TEXTURE_2D);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	
-	world->DrawDebugData();
-	
+
+	_world->DrawDebugData();
+
 	// restore default GL states
 	glEnable(GL_TEXTURE_2D);
 	glEnableClientState(GL_COLOR_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-
 }
 
--(void) addNewSpriteWithCoords:(CGPoint)p
-{
-	CCLOG(@"Add sprite %0.2f x %02.f",p.x,p.y);
-	CCSpriteBatchNode *batch = (CCSpriteBatchNode*) [self getChildByTag:kTagBatchNode];
-	
-	//We have a 64x64 sprite sheet with 4 different 32x32 images.  The following code is
-	//just randomly picking one of the images
-	int idx = (CCRANDOM_0_1() > .5 ? 0:1);
-	int idy = (CCRANDOM_0_1() > .5 ? 0:1);
-	CCSprite *sprite = [CCSprite spriteWithBatchNode:batch rect:CGRectMake(32 * idx,32 * idy,32,32)];
-	[batch addChild:sprite];
-	
-	sprite.position = ccp( p.x, p.y);
-	
-	// Define the dynamic body.
-	//Set up a 1m squared box in the physics world
-	b2BodyDef bodyDef;
-	bodyDef.type = b2_dynamicBody;
-
-	bodyDef.position.Set(p.x/PTM_RATIO, p.y/PTM_RATIO);
-	bodyDef.userData = sprite;
-	b2Body *body = world->CreateBody(&bodyDef);
-	
-	// Define another box shape for our dynamic body.
-	b2PolygonShape dynamicBox;
-	dynamicBox.SetAsBox(.5f, .5f);//These are mid points for our 1m box
-	
-	// Define the dynamic body fixture.
-	b2FixtureDef fixtureDef;
-	fixtureDef.shape = &dynamicBox;	
-	fixtureDef.density = 1.0f;
-	fixtureDef.friction = 0.3f;
-	body->CreateFixture(&fixtureDef);
-}
-
-
-
--(void) tick: (ccTime) dt
-{
+- (void)tick:(ccTime)dt {
 	//It is recommended that a fixed time step is used with Box2D for stability
 	//of the simulation, however, we are using a variable time step here.
 	//You need to make an informed choice, the following URL is useful
 	//http://gafferongames.com/game-physics/fix-your-timestep/
-	
-	int32 velocityIterations = 8;
-	int32 positionIterations = 1;
-	
+
+	int32 velocityIterations = 10;
+	int32 positionIterations = 10;
+
 	// Instruct the world to perform a single step of simulation. It is
 	// generally best to keep the time step and iterations fixed.
-	world->Step(dt, velocityIterations, positionIterations);
+	_world->Step(dt, velocityIterations, positionIterations);
 
-	
 	//Iterate over the bodies in the physics world
-	for (b2Body* b = world->GetBodyList(); b; b = b->GetNext())
-	{
-		if (b->GetUserData() != NULL) {
-			//Synchronize the AtlasSprites position and rotation with the corresponding body
-			CCSprite *myActor = (CCSprite*)b->GetUserData();
-			myActor.position = CGPointMake( b->GetPosition().x * PTM_RATIO, b->GetPosition().y * PTM_RATIO);
-			myActor.rotation = -1 * CC_RADIANS_TO_DEGREES(b->GetAngle());
-		}	
-	}
+    for(b2Body *b = _world->GetBodyList(); b; b=b->GetNext()) {
+        if (b->GetUserData() != NULL) {
+            CCSprite *sprite = (CCSprite *)b->GetUserData();
+
+            if (sprite.tag == kTagBall) {
+                static int maxSpeed = 10;
+
+                b2Vec2 velocity = b->GetLinearVelocity();
+                float32 speed = velocity.Length();
+
+                // When the ball is greater than max speed, slow it down by
+                // applying linear damping.  This is better for the simulation
+                // than raw adjustment of the velocity.
+                if (speed > maxSpeed) {
+                    b->SetLinearDamping(0.5);
+                } else if (speed < maxSpeed) {
+                    b->SetLinearDamping(0.0);
+                }
+            }
+
+            sprite.position = ccp(b->GetPosition().x * PTM_RATIO, b->GetPosition().y * PTM_RATIO);
+            sprite.rotation = -1 * CC_RADIANS_TO_DEGREES(b->GetAngle());
+        }
+    }
 }
 
-- (void)ccTouchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
-{
-	//Add a new body/atlas sprite at the touched location
-	for( UITouch *touch in touches ) {
-		CGPoint location = [touch locationInView: [touch view]];
-		
-		location = [[CCDirector sharedDirector] convertToGL: location];
-		
-		[self addNewSpriteWithCoords: location];
-	}
+- (void)ccTouchesBeganWithEvent:(NSSet*)touches withEvent:(UIEvent*)event {
+    if (_mouseJoint != NULL) return;
+
+    UITouch *myTouch = [touches anyObject];
+    CGPoint location = [myTouch locationInView:[myTouch view]];
+
+    location = [[CCDirector sharedDirector] convertToGL:location];
+    b2Vec2 locationWorld = b2Vec2(location.x/PTM_RATIO, location.y/PTM_RATIO);
+
+    if (_paddleFixture->TestPoint(locationWorld)) {
+        b2MouseJointDef mouseJointDef;
+        mouseJointDef.bodyA = _groundBody;
+        mouseJointDef.bodyB = _paddleBody;
+        mouseJointDef.target = locationWorld;
+        mouseJointDef.collideConnected = true;
+        mouseJointDef.maxForce = 1000.0f * _paddleBody->GetMass();
+
+        _mouseJoint = (b2MouseJoint*)_world->CreateJoint(&mouseJointDef);
+        _paddleBody->SetAwake(true);
+    }
 }
 
-- (void)accelerometer:(UIAccelerometer*)accelerometer didAccelerate:(UIAcceleration*)acceleration
-{	
-	static float prevX=0, prevY=0;
-	
-	//#define kFilterFactor 0.05f
-#define kFilterFactor 1.0f	// don't use filter. the code is here just as an example
-	
-	float accelX = (float) acceleration.x * kFilterFactor + (1- kFilterFactor)*prevX;
-	float accelY = (float) acceleration.y * kFilterFactor + (1- kFilterFactor)*prevY;
-	
-	prevX = accelX;
-	prevY = accelY;
-	
-	// accelerometer values are in "Portrait" mode. Change them to Landscape left
-	// multiply the gravity by 10
-	b2Vec2 gravity( -accelY * 10, accelX * 10);
-	
-	world->SetGravity( gravity );
+- (void)ccTouchesMovedWithEvent:(NSSet*)touches withEvent:(UIEvent*)event {
+    if (_mouseJoint == NULL) return;
+
+    UITouch *myTouch = [touches anyObject];
+    CGPoint location = [myTouch locationInView:[myTouch view]];
+    location = [[CCDirector sharedDirector] convertToGL:location];
+    b2Vec2 locationWorld = b2Vec2(location.x/PTM_RATIO, location.y/PTM_RATIO);
+
+    _mouseJoint->SetTarget(locationWorld);
+}
+
+- (void)ccTouchesCancelledWithEvent:(NSSet*)touches withEvent:(UIEvent*)event {
+    if (_mouseJoint) {
+        _world->DestroyJoint(_mouseJoint);
+        _mouseJoint = NULL;
+    }
+}
+
+- (void)ccTouchesEnded:(NSSet*)touches withEvent:(UIEvent*)event {
+    if (_mouseJoint) {
+        _world->DestroyJoint(_mouseJoint);
+        _mouseJoint = NULL;
+    }
 }
 
 // on "dealloc" you need to release all your retained objects
-- (void) dealloc
-{
+- (void)dealloc {
 	// in case you have something to dealloc, do it in this method
-	delete world;
-	world = NULL;
-	
+	delete _world;
+	_world = NULL;
+    _groundBody = NULL;
+
 	delete m_debugDraw;
 
 	// don't forget to call "super dealloc"
