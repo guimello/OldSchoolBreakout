@@ -12,6 +12,9 @@
 #import "Box2D.h"
 #import "GLES-Render.h"
 
+#import "ContactListener.h"
+
+
 // GameLayer
 @interface GameLayer : CCLayer {
 	GLESDebugDraw *m_debugDraw;
@@ -23,6 +26,8 @@
     b2Fixture *_ballFixture;
     b2Fixture *_bottomFixture;
     b2MouseJoint *_mouseJoint;
+
+    ContactListener *_contactListener;
 }
 
 // returns a CCScene that contains the GameLayer as the only child

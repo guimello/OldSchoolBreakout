@@ -10,21 +10,19 @@
 // Import the interfaces
 #import "GameLayer.h"
 
+#import "GameOverScene.h"
+#import "SimpleAudioEngine.h"
+
 //Pixel to metres ratio. Box2D uses metres as the unit for measurement.
 //This ratio defines how many pixels correspond to 1 Box2D "metre"
 //Box2D is optimized for objects of 1x1 metre therefore it makes sense
 //to define the ratio so that your most common object type is 1x1 metre.
 #define PTM_RATIO 32
 
-// enums that will be used as tags
-enum {
-	kTagTileMap = 1,
-	kTagBatchNode = 1,
-	kTagAnimation1 = 1,
-};
 
 enum {
     kTagBall = 1,
+    kTagBlock = 2,
 };
 
 
@@ -50,6 +48,8 @@ enum {
 	// always call "super" init
 	// Apple recommends to re-assign "self" with the "super" return value
 	if( (self = [super init])) {
+
+        [[SimpleAudioEngine sharedEngine] playBackgroundMusic:@"background-music-aac.caf"];
 
 		// enable touches
 		self.isTouchEnabled = YES;
@@ -176,6 +176,42 @@ enum {
         jointDef.Initialize(_paddleBody, _groundBody, _paddleBody->GetWorldCenter(), worldAxis);
         _world->CreateJoint(&jointDef);
 
+        // Create contact listener
+        _contactListener = new ContactListener();
+        _world->SetContactListener(_contactListener);
+
+        // Create blocks
+        for (int i = 0; i < 4; i++) {
+            static int padding = 20;
+
+            // Create block and add it to the layer
+            CCSprite *block = [CCSprite spriteWithFile:@"Block.jpg"];
+
+            int xOffSet = padding + block.contentSize.width/2 + ((block.contentSize.width + padding) * i);
+
+            block.position = ccp(xOffSet, 250);
+            block.tag = kTagBlock;
+            [self addChild:block];
+
+            // Create block body
+            b2BodyDef blockBodyDef;
+            blockBodyDef.type = b2_dynamicBody;
+            blockBodyDef.position.Set(((float)xOffSet)/PTM_RATIO, 250/PTM_RATIO);
+            blockBodyDef.userData = block;
+            b2Body *blockBody = _world->CreateBody(&blockBodyDef);
+
+            // Create block shapes
+            b2PolygonShape blockShape;
+            blockShape.SetAsBox(block.contentSize.width/PTM_RATIO/2, block.contentSize.height/PTM_RATIO/2);
+
+            // Create shape definition and add to body
+            b2FixtureDef blockShapeDef;
+            blockShapeDef.shape = &blockShape;
+            blockShapeDef.density = 10.0;
+            blockShapeDef.friction = 0.0;
+            blockShapeDef.restitution = 0.1f;
+            blockBody->CreateFixture(&blockShapeDef);
+        }
 
 		[self schedule: @selector(tick:)];
 	}
@@ -212,10 +248,15 @@ enum {
 	// generally best to keep the time step and iterations fixed.
 	_world->Step(dt, velocityIterations, positionIterations);
 
+    // Used to know if the user won
+    bool blockFound = false;
+
 	//Iterate over the bodies in the physics world
     for(b2Body *b = _world->GetBodyList(); b; b=b->GetNext()) {
         if (b->GetUserData() != NULL) {
             CCSprite *sprite = (CCSprite *)b->GetUserData();
+
+            if (sprite.tag == kTagBlock) blockFound = true;
 
             if (sprite.tag == kTagBall) {
                 static int maxSpeed = 10;
@@ -236,6 +277,64 @@ enum {
             sprite.position = ccp(b->GetPosition().x * PTM_RATIO, b->GetPosition().y * PTM_RATIO);
             sprite.rotation = -1 * CC_RADIANS_TO_DEGREES(b->GetAngle());
         }
+    }
+
+    // Contact
+    std::vector<b2Body*>toDestroy;
+    std::vector<Contact>::iterator pos;
+    for (pos = _contactListener->_contacts.begin(); pos != _contactListener->_contacts.end(); ++pos) {
+        Contact contact = *pos;
+
+        if ( (contact.fixtureA == _bottomFixture && contact.fixtureB == _ballFixture) ||
+             (contact.fixtureA == _ballFixture   && contact.fixtureB == _bottomFixture) ) {
+
+            NSLog(@"Ball hit bottom!");
+
+            GameOverScene *gameOverScene = [GameOverScene node];
+            [gameOverScene.layer.label setString:@"You lose :("];
+
+            [[CCDirector sharedDirector] replaceScene:gameOverScene];
+        }
+
+        b2Body *bodyA = contact.fixtureA->GetBody();
+        b2Body *bodyB = contact.fixtureB->GetBody();
+
+        if (bodyA->GetUserData() != NULL && bodyB->GetUserData() != NULL) {
+            CCSprite *spriteA = (CCSprite*) bodyA->GetUserData();
+            CCSprite *spriteB = (CCSprite*) bodyB->GetUserData();
+
+            // Sprite A = ball, Sprite B = Block
+            if (spriteA.tag == kTagBall && spriteB.tag == kTagBlock) {
+                if (std::find(toDestroy.begin(), toDestroy.end(), bodyB) == toDestroy.end()) {
+                    toDestroy.push_back(bodyB);
+                }
+            }
+            else if (spriteA.tag == kTagBlock && spriteB.tag == kTagBall) {
+                if (std::find(toDestroy.begin(), toDestroy.end(), bodyA) == toDestroy.end()) {
+                    toDestroy.push_back(bodyA);
+                }
+            }
+        }
+    }
+
+    if (toDestroy.size() > 0) [[SimpleAudioEngine sharedEngine] playEffect:@"blip.caf"];
+
+    std::vector<b2Body*>::iterator pos2;
+    for (pos2 = toDestroy.begin(); pos2 != toDestroy.end(); ++pos2) {
+        b2Body *body = *pos2;
+
+        if (body->GetUserData() != NULL) {
+            CCSprite *sprite = (CCSprite*) body->GetUserData();
+            [self removeChild:sprite cleanup:YES];
+        }
+
+        _world->DestroyBody(body);
+    }
+
+    if (!blockFound) {
+        GameOverScene *gameOverScene = [GameOverScene node];
+        [gameOverScene.layer.label setString:@"You win! :)"];
+        [[CCDirector sharedDirector] replaceScene:gameOverScene];
     }
 }
 
@@ -294,6 +393,8 @@ enum {
     _groundBody = NULL;
 
 	delete m_debugDraw;
+
+    delete _contactListener;
 
 	// don't forget to call "super dealloc"
 	[super dealloc];
